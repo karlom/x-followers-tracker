@@ -15,47 +15,57 @@ X Followers Tracker - An automated tool that tracks X.com (formerly Twitter) fol
 ## Architecture
 
 **Core Components:**
-1. **track_followers.py** - Main Python script containing:
-   - API client for X API v2 endpoint: `GET /2/users/by/username/:username?user.fields=public_metrics`
+
+1. **main.py** - Main entry point containing:
+   - API client for X API v2: `GET /2/users/by/username/:username?user.fields=public_metrics`
    - Growth calculation logic (delta and percentage)
-   - Data storage handler (CSV and optional Google Sheets)
-   - Error handling with retry logic
+   - Retry mechanism for API failures
+   - Integration with storage backends
 
-2. **.github/workflows/daily.yml** - GitHub Actions workflow for daily scheduling
+2. **storage.py** - Storage abstraction layer:
+   - `StorageBackend`: Abstract base class
+   - `CSVStorage`: Local CSV file storage (default)
+   - `SheetsStorage`: Google Sheets integration via gspread
+   - `get_storage_backend()`: Factory function for mode selection
 
-3. **Data Storage:**
-   - Default: Local CSV file committed to repo
-   - Optional: Google Sheets integration via gspread
+3. **.github/workflows/daily.yml** - GitHub Actions workflow:
+   - Cron schedule (daily at UTC 8:00)
+   - Python environment setup
+   - Automatic git commit/push (CSV mode only)
 
 **Data Flow:**
-1. Scheduled trigger (GitHub Actions cron)
-2. Fetch current follower count from X API
-3. Read last record from storage
-4. Calculate delta and growth rate
-5. Append new record to storage
-6. Commit and push updated file (CSV mode)
+1. Scheduled trigger (GitHub Actions cron) or manual execution
+2. Initialize storage backend based on STORAGE_TYPE
+3. Fetch current follower count from X API (with retry)
+4. Read last record from storage
+5. Calculate delta and growth rate
+6. Save new record to storage
+7. Commit and push (CSV mode only)
 
 ## Development Commands
 
 ### Local Development
 ```bash
 # Run tracker manually
-python track_followers.py
+python main.py
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Install with Google Sheets support (optional)
-pip install -r requirements.txt gspread google-auth
+# Run tests
+python test_tracker.py  # Core functionality tests
+python test_storage.py  # Storage backend tests
 ```
 
 ### Testing
 ```bash
-# Run unit tests (when implemented)
-python -m pytest tests/
+# Run functionality tests
+python test_tracker.py
 
-# Test specific module
-python -m pytest tests/test_api.py
+# Run storage backend tests
+python test_storage.py
+
+# Both test suites should pass all tests
 ```
 
 ## Configuration
@@ -76,9 +86,17 @@ python -m pytest tests/test_api.py
 
 ## Code Structure Requirements
 
-**Modularization:**
-- Separate functions for: API calls, growth calculation, CSV operations, Sheets operations
-- Each function must have docstrings explaining purpose, parameters, and return values
+**File Organization:**
+- `main.py`: Entry point and API integration
+- `storage.py`: Storage backend abstraction
+- `test_tracker.py`: Core functionality tests
+- `test_storage.py`: Storage backend tests
+
+**Storage Backend Pattern:**
+- All storage backends inherit from `StorageBackend` ABC
+- Implement three methods: `initialize()`, `load_last_record()`, `save_record()`
+- Use factory pattern via `get_storage_backend()` for instantiation
+- Mode selection via `STORAGE_TYPE` environment variable
 
 **Error Handling:**
 - API call failures: Retry once, then log error and exit gracefully
@@ -96,17 +114,21 @@ rate = (delta / previous_count) * 100  # Handle division by zero
 **Workflow Schedule:**
 - Cron: "0 8 * * *" (daily at 8:00 UTC)
 - Configurable in `.github/workflows/daily.yml`
+- Manual trigger supported via `workflow_dispatch`
 
 **Workflow Steps:**
 1. Checkout repository
-2. Set up Python 3.8+
-3. Install dependencies
-4. Run tracker script
-5. Commit and push updated CSV (if changed)
+2. Set up Python 3.11 with pip caching
+3. Install dependencies from requirements.txt
+4. Run tracker script with environment variables
+5. Commit and push updated CSV (CSV mode only, conditional)
 
 **Secrets Configuration:**
-- Store `X_BEARER_TOKEN` in GitHub repository secrets
-- Optional: `GOOGLE_SERVICE_ACCOUNT_JSON` for Sheets mode
+- `X_BEARER_TOKEN`: Required
+- `X_USERNAME`: Required
+- `STORAGE_TYPE`: Optional (default: csv)
+- `GOOGLE_SHEETS_ID`: Required for Sheets mode
+- `GOOGLE_SERVICE_ACCOUNT_JSON`: Required for Sheets mode
 
 ## Technical Constraints
 
@@ -128,14 +150,16 @@ rate = (delta / previous_count) * 100  # Handle division by zero
 When implementing new features:
 1. Update requirements.txt if new dependencies are added
 2. Ensure all functions have docstrings
-3. Test locally before committing
-4. Update this CLAUDE.md if architecture changes
-5. Test GitHub Actions workflow in a fork before deploying
+3. Add tests to test_tracker.py or test_storage.py
+4. Test locally before committing
+5. Update README.md with usage instructions
+6. Update this CLAUDE.md if architecture changes
 
-## Future Extensions (Not in Scope)
+## Project Status
 
-- Real-time monitoring
-- Email/Slack notifications on errors
-- Multi-user support
-- Data visualization dashboard
-- Additional metrics (likes, retweets, etc.)
+✅ **Complete - Production Ready**
+- Stage 1: Core CSV tracking ✓
+- Stage 2: Project configuration ✓
+- Stage 3: GitHub Actions automation ✓
+- Stage 4: Google Sheets support ✓
+- Stage 5: Final validation ✓
