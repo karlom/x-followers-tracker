@@ -227,7 +227,6 @@ class NotionStorage(StorageBackend):
         try:
             # Get today's date to exclude today's records
             today = datetime.date.today().isoformat()
-            print(f"🔍 Debug: Today's date = {today}")
 
             # Use search API to find all pages
             # Note: In newer Notion API, we use search instead of database query
@@ -244,7 +243,6 @@ class NotionStorage(StorageBackend):
             )
 
             results = response.get('results', [])
-            print(f"🔍 Debug: Search returned {len(results)} total pages")
 
             # Filter pages that belong to our database and have Date property
             database_pages = []
@@ -258,22 +256,6 @@ class NotionStorage(StorageBackend):
                     if parent_db_id == self.database_id:
                         database_pages.append(page)
 
-            print(f"🔍 Debug: Found {len(database_pages)} pages in our database")
-            print(f"🔍 Debug: Expected database_id = {self.database_id}")
-            print(f"🔍 Debug: Expected ID length = {len(self.database_id)}, repr = {repr(self.database_id)}")
-
-            # Debug: Show what we're actually getting
-            if len(results) > 0 and len(database_pages) == 0:
-                print("🔍 Debug: No matches found. Checking first few pages:")
-                for i, page in enumerate(results[:3]):
-                    parent = page.get('parent', {})
-                    parent_type = parent.get('type')
-                    parent_db_id = parent.get('database_id') or parent.get('data_source_id')
-                    print(f"  Page {i+1}: type={parent_type}, id={parent_db_id}")
-                    if parent_db_id:
-                        print(f"          length={len(parent_db_id)}, repr={repr(parent_db_id)}")
-                        print(f"          Match: {parent_db_id == self.database_id}")
-
             if not database_pages:
                 print("ℹ No historical data found in Notion (first run)")
                 return 0
@@ -286,15 +268,9 @@ class NotionStorage(StorageBackend):
                 date_obj = date_property.get('date', {})
                 if date_obj and date_obj.get('start'):
                     record_date = date_obj.get('start')
-                    print(f"🔍 Debug: Found record with date {record_date}")
                     # Only include records from before today
                     if record_date < today:
                         dated_pages.append((page, record_date))
-                        print(f"  ✓ Included (before today)")
-                    else:
-                        print(f"  ✗ Excluded (today or future)")
-
-            print(f"🔍 Debug: After filtering, {len(dated_pages)} records from before today")
 
             if not dated_pages:
                 print("ℹ No historical data found in Notion (first run)")

@@ -1,9 +1,9 @@
 name: Daily Followers Tracker
 
 on:
-  # 每天 UTC 8:00 自动运行
+  # 每天北京时间早上 5:00 自动运行（UTC 前一天 21:00）
   schedule:
-    - cron: '0 8 * * *'
+    - cron: '0 21 * * *'
 
   # 允许手动触发
   workflow_dispatch:
@@ -18,14 +18,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Debug - Show current commit
-        run: |
-          echo "Current commit:"
-          git log -1 --oneline
-          echo ""
-          echo "Checking storage.py for the fix:"
-          grep -n "record_date < today" storage.py || echo "FIX NOT FOUND!"
 
       - name: Set up Python
         uses: actions/setup-python@v5
