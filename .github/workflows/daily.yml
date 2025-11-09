@@ -41,12 +41,3 @@ jobs:
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: |
           python main.py
-
-      - name: Commit and push if changed (CSV mode only)
-        if: ${{ !secrets.STORAGE_TYPE || secrets.STORAGE_TYPE == 'csv' }}
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add followers_log.csv
-          git diff --staged --quiet || git commit -m "chore: Update followers data - $(date +'%Y-%m-%d')"
-          git push
