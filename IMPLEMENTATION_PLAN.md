@@ -104,14 +104,26 @@
 - 模式切换：验证不同配置下的行为
 
 **Tasks**:
-- [ ] 添加 gspread, google-auth 到 requirements.txt
-- [ ] 实现 SheetsStorage 类（init, read_last, append）
-- [ ] 重构 main.py 支持存储模式抽象
-- [ ] 添加 STORAGE_TYPE 环境变量
-- [ ] 更新 workflow 支持 Sheets 配置
-- [ ] 添加 Sheets 设置文档到 README
+- [x] 添加 gspread, google-auth 到 requirements.txt
+- [x] 实现 SheetsStorage 类（init, read_last, append）
+- [x] 重构 main.py 支持存储模式抽象
+- [x] 添加 STORAGE_TYPE 环境变量
+- [x] 更新 workflow 支持 Sheets 配置
+- [x] 添加 Sheets 设置文档到 README
 
-**Status**: Not Started
+**Status**: ✅ Complete
+
+**Test Results**:
+- CSV storage backend: ✓
+- Storage factory function: ✓
+- Mode switching logic: ✓
+
+**Notes**:
+- 创建了抽象存储层（storage.py）
+- 支持 CSV 和 Google Sheets 双模式
+- 通过 STORAGE_TYPE 环境变量切换
+- Workflow 自动适配存储模式（Sheets 模式不提交）
+- 完整的 Google Cloud 配置文档
 
 ---
 
@@ -141,6 +153,6 @@
 ---
 
 ## Progress Tracking
-- **Current Stage**: Stage 4
-- **Overall Status**: 3/5 stages complete (60%)
+- **Current Stage**: Stage 5
+- **Overall Status**: 4/5 stages complete (80%)
 - **Last Updated**: 2025-11-09

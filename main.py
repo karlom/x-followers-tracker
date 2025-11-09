@@ -3,18 +3,16 @@ X.com Followers Tracker
 Automatically tracks follower count daily and calculates growth metrics.
 """
 import requests
-import datetime
-import csv
 import os
 import time
 from dotenv import load_dotenv
+from storage import get_storage_backend
 
 # Load environment variables
 load_dotenv()
 
 BEARER_TOKEN = os.getenv('X_BEARER_TOKEN')
 USERNAME = os.getenv('X_USERNAME')
-CSV_FILE = os.getenv('CSV_FILE_PATH', 'followers_log.csv')
 
 
 def get_followers_count():
@@ -51,57 +49,6 @@ def get_followers_count():
     raise Exception("Failed to fetch followers count after 2 attempts")
 
 
-def initialize_csv():
-    """
-    Initialize CSV file with header if it doesn't exist.
-    """
-    if not os.path.exists(CSV_FILE):
-        with open(CSV_FILE, 'w', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow(['date', 'followers_count', 'delta', 'rate'])
-        print(f"✓ Created new CSV file: {CSV_FILE}")
-
-
-def load_last_record():
-    """
-    Load the last recorded followers count from CSV.
-
-    Returns:
-        int: Last followers count, or 0 if no history exists
-    """
-    try:
-        with open(CSV_FILE, 'r') as f:
-            reader = csv.reader(f)
-            rows = list(reader)
-            if len(rows) > 1:  # Has data beyond header
-                last_row = rows[-1]
-                last_count = int(last_row[1])
-                print(f"✓ Loaded last record: {last_count} followers on {last_row[0]}")
-                return last_count
-            else:
-                print("ℹ No historical data found (first run)")
-                return 0
-    except FileNotFoundError:
-        print("ℹ No CSV file found (first run)")
-        return 0
-
-
-def save_record(current_count, delta, growth_rate):
-    """
-    Append new record to CSV file.
-
-    Args:
-        current_count (int): Current followers count
-        delta (int): Change from previous count
-        growth_rate (float): Growth percentage
-    """
-    today = datetime.date.today().isoformat()
-    with open(CSV_FILE, 'a', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow([today, current_count, delta, f"{growth_rate:.2f}%"])
-    print(f"✓ Saved record: {today}, {current_count} followers, Δ{delta:+d} ({growth_rate:+.2f}%)")
-
-
 def main():
     """
     Main execution logic.
@@ -116,11 +63,16 @@ def main():
         print("  Please set X_BEARER_TOKEN and X_USERNAME")
         return
 
-    # Initialize CSV if needed
-    initialize_csv()
+    # Initialize storage backend
+    try:
+        storage = get_storage_backend()
+        storage.initialize()
+    except Exception as e:
+        print(f"✗ Storage initialization failed: {e}")
+        return
 
     # Load last record
-    last_count = load_last_record()
+    last_count = storage.load_last_record()
 
     # Fetch current count
     try:
@@ -134,7 +86,7 @@ def main():
     growth_rate = (delta / last_count * 100) if last_count > 0 else 0.0
 
     # Save record
-    save_record(current_count, delta, growth_rate)
+    storage.save_record(current_count, delta, growth_rate)
 
     print("=" * 60)
     print("✓ Tracking completed successfully")

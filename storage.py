@@ -1,0 +1,199 @@
+"""
+Storage backends for followers data.
+Supports CSV (local file) and Google Sheets (online).
+"""
+import csv
+import os
+import datetime
+from abc import ABC, abstractmethod
+
+
+class StorageBackend(ABC):
+    """Abstract base class for storage backends."""
+
+    @abstractmethod
+    def initialize(self):
+        """Initialize storage (create file/sheet if needed)."""
+        pass
+
+    @abstractmethod
+    def load_last_record(self):
+        """
+        Load the last recorded followers count.
+
+        Returns:
+            int: Last followers count, or 0 if no history
+        """
+        pass
+
+    @abstractmethod
+    def save_record(self, current_count, delta, growth_rate):
+        """
+        Save a new record.
+
+        Args:
+            current_count (int): Current followers count
+            delta (int): Change from previous count
+            growth_rate (float): Growth percentage
+        """
+        pass
+
+
+class CSVStorage(StorageBackend):
+    """CSV file storage backend."""
+
+    def __init__(self, file_path='followers_log.csv'):
+        """
+        Initialize CSV storage.
+
+        Args:
+            file_path (str): Path to CSV file
+        """
+        self.file_path = file_path
+
+    def initialize(self):
+        """Create CSV file with header if it doesn't exist."""
+        if not os.path.exists(self.file_path):
+            with open(self.file_path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['date', 'followers_count', 'delta', 'rate'])
+            print(f"✓ Created new CSV file: {self.file_path}")
+
+    def load_last_record(self):
+        """Load last record from CSV file."""
+        try:
+            with open(self.file_path, 'r') as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                if len(rows) > 1:  # Has data beyond header
+                    last_row = rows[-1]
+                    last_count = int(last_row[1])
+                    print(f"✓ Loaded last record: {last_count} followers on {last_row[0]}")
+                    return last_count
+                else:
+                    print("ℹ No historical data found (first run)")
+                    return 0
+        except FileNotFoundError:
+            print("ℹ No CSV file found (first run)")
+            return 0
+
+    def save_record(self, current_count, delta, growth_rate):
+        """Append record to CSV file."""
+        today = datetime.date.today().isoformat()
+        with open(self.file_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([today, current_count, delta, f"{growth_rate:.2f}%"])
+        print(f"✓ Saved record: {today}, {current_count} followers, Δ{delta:+d} ({growth_rate:+.2f}%)")
+
+
+class SheetsStorage(StorageBackend):
+    """Google Sheets storage backend."""
+
+    def __init__(self, spreadsheet_id, credentials_json):
+        """
+        Initialize Google Sheets storage.
+
+        Args:
+            spreadsheet_id (str): Google Sheets ID
+            credentials_json (str): Service account credentials (JSON string)
+        """
+        self.spreadsheet_id = spreadsheet_id
+        self.credentials_json = credentials_json
+        self.worksheet = None
+        self._connect()
+
+    def _connect(self):
+        """Connect to Google Sheets."""
+        try:
+            import gspread
+            from google.oauth2.service_account import Credentials
+            import json
+
+            # Parse credentials
+            creds_dict = json.loads(self.credentials_json)
+            scopes = [
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive'
+            ]
+            credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+
+            # Connect to spreadsheet
+            client = gspread.authorize(credentials)
+            spreadsheet = client.open_by_key(self.spreadsheet_id)
+            self.worksheet = spreadsheet.sheet1  # Use first sheet
+
+            print(f"✓ Connected to Google Sheets: {spreadsheet.title}")
+
+        except ImportError:
+            raise ImportError(
+                "Google Sheets support requires: pip install gspread google-auth"
+            )
+        except Exception as e:
+            raise Exception(f"Failed to connect to Google Sheets: {e}")
+
+    def initialize(self):
+        """Initialize Google Sheets with header if empty."""
+        if not self.worksheet:
+            raise Exception("Not connected to Google Sheets")
+
+        # Check if sheet is empty
+        values = self.worksheet.get_all_values()
+        if not values or len(values) == 0:
+            # Add header
+            self.worksheet.append_row(['date', 'followers_count', 'delta', 'rate'])
+            print("✓ Initialized Google Sheets with header")
+        elif values[0] != ['date', 'followers_count', 'delta', 'rate']:
+            # Verify header
+            print("⚠ Warning: Sheet header doesn't match expected format")
+
+    def load_last_record(self):
+        """Load last record from Google Sheets."""
+        if not self.worksheet:
+            raise Exception("Not connected to Google Sheets")
+
+        values = self.worksheet.get_all_values()
+        if len(values) > 1:  # Has data beyond header
+            last_row = values[-1]
+            last_count = int(last_row[1])
+            print(f"✓ Loaded last record: {last_count} followers on {last_row[0]}")
+            return last_count
+        else:
+            print("ℹ No historical data found (first run)")
+            return 0
+
+    def save_record(self, current_count, delta, growth_rate):
+        """Append record to Google Sheets."""
+        if not self.worksheet:
+            raise Exception("Not connected to Google Sheets")
+
+        today = datetime.date.today().isoformat()
+        row = [today, current_count, delta, f"{growth_rate:.2f}%"]
+        self.worksheet.append_row(row)
+        print(f"✓ Saved record to Sheets: {today}, {current_count} followers, Δ{delta:+d} ({growth_rate:+.2f}%)")
+
+
+def get_storage_backend():
+    """
+    Factory function to get appropriate storage backend based on environment.
+
+    Returns:
+        StorageBackend: Configured storage backend instance
+    """
+    storage_type = os.getenv('STORAGE_TYPE', 'csv').lower()
+
+    if storage_type == 'sheets':
+        spreadsheet_id = os.getenv('GOOGLE_SHEETS_ID')
+        credentials_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
+
+        if not spreadsheet_id or not credentials_json:
+            raise ValueError(
+                "Google Sheets mode requires GOOGLE_SHEETS_ID and "
+                "GOOGLE_SERVICE_ACCOUNT_JSON environment variables"
+            )
+
+        print("📊 Using Google Sheets storage")
+        return SheetsStorage(spreadsheet_id, credentials_json)
+    else:
+        csv_file_path = os.getenv('CSV_FILE_PATH', 'followers_log.csv')
+        print(f"📁 Using CSV storage: {csv_file_path}")
+        return CSVStorage(csv_file_path)

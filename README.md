@@ -87,37 +87,105 @@ date,followers_count,delta,rate
 
 环境变量（在 `.env` 文件中配置）：
 
+### 基础配置
+
 | 变量名 | 必需 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `X_BEARER_TOKEN` | 是 | - | X API Bearer Token |
 | `X_USERNAME` | 是 | - | 要追踪的 X 用户名 |
+| `STORAGE_TYPE` | 否 | `csv` | 存储类型：`csv` 或 `sheets` |
+
+### CSV 存储配置（当 STORAGE_TYPE=csv 时）
+
+| 变量名 | 必需 | 默认值 | 说明 |
+|--------|------|--------|------|
 | `CSV_FILE_PATH` | 否 | `followers_log.csv` | CSV 文件路径 |
+
+### Google Sheets 存储配置（当 STORAGE_TYPE=sheets 时）
+
+| 变量名 | 必需 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `GOOGLE_SHEETS_ID` | 是 | - | Google Sheets 文档 ID |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | 是 | - | Google 服务账号 JSON（字符串） |
+
+## Google Sheets 配置指南
+
+### 1. 创建 Google Cloud 服务账号
+
+1. 访问 [Google Cloud Console](https://console.cloud.google.com/)
+2. 创建新项目或选择现有项目
+3. 启用 Google Sheets API 和 Google Drive API
+4. 创建服务账号：
+   - IAM & Admin → Service Accounts → Create Service Account
+   - 记录服务账号邮箱（如 `xxx@xxx.iam.gserviceaccount.com`）
+5. 创建密钥：
+   - 点击服务账号 → Keys → Add Key → Create New Key
+   - 选择 JSON 格式
+   - 下载 JSON 文件
+
+### 2. 配置 Google Sheets
+
+1. 创建一个新的 Google Sheets 文档
+2. 从 URL 中复制 Spreadsheet ID：
+   ```
+   https://docs.google.com/spreadsheets/d/【这部分是ID】/edit
+   ```
+3. 共享文档给服务账号邮箱（Editor 权限）
+
+### 3. 配置环境变量
+
+```bash
+# .env 文件
+STORAGE_TYPE=sheets
+GOOGLE_SHEETS_ID=你的Spreadsheet_ID
+GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
+```
+
+**注意**: JSON 内容需要压缩成一行，或者使用文件路径。
+
+### 4. GitHub Actions 配置
+
+在 GitHub Secrets 中添加（如果使用 Sheets 模式）：
+- `STORAGE_TYPE`: `sheets`
+- `GOOGLE_SHEETS_ID`: 你的 Spreadsheet ID
+- `GOOGLE_SERVICE_ACCOUNT_JSON`: 服务账号 JSON 内容（完整）
 
 ## 项目结构
 
 ```
 x-followers-tracker/
 ├── main.py                 # 主脚本
-├── test_tracker.py         # 测试套件
+├── storage.py              # 存储抽象层（CSV/Sheets）
+├── test_tracker.py         # 功能测试
+├── test_storage.py         # 存储后端测试
 ├── requirements.txt        # Python 依赖
 ├── .env.example            # 环境变量模板
 ├── .gitignore              # Git 忽略规则
 ├── CLAUDE.md               # Claude Code 项目文档
 ├── IMPLEMENTATION_PLAN.md  # 开发计划（开发中）
-└── followers_log.csv       # 数据文件（自动生成）
+└── followers_log.csv       # 数据文件（CSV模式，自动生成）
 ```
 
 ## 运行测试
 
 ```bash
+# 测试核心功能
 python test_tracker.py
+
+# 测试存储后端
+python test_storage.py
 ```
 
-测试包含：
+**功能测试**包含：
 - CSV 初始化
 - 首次运行（无历史数据）
 - 增长计算
 - 数据持久化
+
+**存储测试**包含：
+- CSV 存储后端
+- 存储工厂函数
+- 模式切换
 
 ## 故障排查
 
@@ -165,10 +233,10 @@ X API Free Tier 限制：
 ## 路线图
 
 - [x] Stage 1: 核心 CSV 追踪功能
-- [ ] Stage 2: 项目配置和文档（进行中）
-- [ ] Stage 3: GitHub Actions 自动化
-- [ ] Stage 4: Google Sheets 支持
-- [ ] Stage 5: 最终验证和文档
+- [x] Stage 2: 项目配置和文档
+- [x] Stage 3: GitHub Actions 自动化
+- [x] Stage 4: Google Sheets 支持
+- [ ] Stage 5: 最终验证和文档（进行中）
 
 ## 许可证
 
