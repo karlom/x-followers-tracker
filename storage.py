@@ -183,8 +183,8 @@ class NotionStorage(StorageBackend):
             token (str): Notion Integration Token
             database_id (str): Notion Database ID
         """
-        self.token = token
-        self.database_id = database_id
+        self.token = token.strip() if token else token
+        self.database_id = database_id.strip() if database_id else database_id
         self.client = None
         self._connect()
 
@@ -260,6 +260,7 @@ class NotionStorage(StorageBackend):
 
             print(f"🔍 Debug: Found {len(database_pages)} pages in our database")
             print(f"🔍 Debug: Expected database_id = {self.database_id}")
+            print(f"🔍 Debug: Expected ID length = {len(self.database_id)}, repr = {repr(self.database_id)}")
 
             # Debug: Show what we're actually getting
             if len(results) > 0 and len(database_pages) == 0:
@@ -269,6 +270,9 @@ class NotionStorage(StorageBackend):
                     parent_type = parent.get('type')
                     parent_db_id = parent.get('database_id') or parent.get('data_source_id')
                     print(f"  Page {i+1}: type={parent_type}, id={parent_db_id}")
+                    if parent_db_id:
+                        print(f"          length={len(parent_db_id)}, repr={repr(parent_db_id)}")
+                        print(f"          Match: {parent_db_id == self.database_id}")
 
             if not database_pages:
                 print("ℹ No historical data found in Notion (first run)")
