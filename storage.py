@@ -1,6 +1,6 @@
 """
 Storage backends for followers data.
-Supports CSV (local file) and Google Sheets (online).
+Supports CSV (local file), Google Sheets (online), and Notion (database).
 """
 import csv
 import os
@@ -172,6 +172,148 @@ class SheetsStorage(StorageBackend):
         print(f"✓ Saved record to Sheets: {today}, {current_count} followers, Δ{delta:+d} ({growth_rate:+.2f}%)")
 
 
+class NotionStorage(StorageBackend):
+    """Notion database storage backend."""
+
+    def __init__(self, token, database_id):
+        """
+        Initialize Notion storage.
+
+        Args:
+            token (str): Notion Integration Token
+            database_id (str): Notion Database ID
+        """
+        self.token = token
+        self.database_id = database_id
+        self.client = None
+        self._connect()
+
+    def _connect(self):
+        """Connect to Notion API."""
+        try:
+            from notion_client import Client
+
+            self.client = Client(auth=self.token)
+
+            # Test connection by retrieving database info
+            database = self.client.databases.retrieve(database_id=self.database_id)
+            print(f"✓ Connected to Notion Database: {database.get('title', [{}])[0].get('plain_text', 'Untitled')}")
+
+        except ImportError:
+            raise ImportError(
+                "Notion support requires: pip install notion-client"
+            )
+        except Exception as e:
+            raise Exception(f"Failed to connect to Notion: {e}")
+
+    def initialize(self):
+        """Verify Notion database connection and schema."""
+        if not self.client:
+            raise Exception("Not connected to Notion")
+
+        try:
+            # Retrieve database to verify it exists and is accessible
+            database = self.client.databases.retrieve(database_id=self.database_id)
+
+            # Check for required properties
+            properties = database.get('properties', {})
+            required = ['Date', 'Followers Count', 'Delta', 'Rate']
+            missing = [prop for prop in required if prop not in properties]
+
+            if missing:
+                print(f"⚠ Warning: Missing properties in Notion database: {', '.join(missing)}")
+                print(f"   Please add these properties to your database")
+            else:
+                print("✓ Notion database schema verified")
+
+        except Exception as e:
+            raise Exception(f"Failed to verify Notion database: {e}")
+
+    def load_last_record(self):
+        """Load last record from Notion database."""
+        if not self.client:
+            raise Exception("Not connected to Notion")
+
+        try:
+            # Query database, sorted by Date descending
+            response = self.client.databases.query(
+                database_id=self.database_id,
+                sorts=[
+                    {
+                        "property": "Date",
+                        "direction": "descending"
+                    }
+                ],
+                page_size=1
+            )
+
+            results = response.get('results', [])
+
+            if results:
+                # Extract data from the last record
+                page = results[0]
+                properties = page.get('properties', {})
+
+                # Get followers count
+                followers_property = properties.get('Followers Count', {})
+                last_count = followers_property.get('number', 0)
+
+                # Get date for logging
+                date_property = properties.get('Date', {})
+                date_obj = date_property.get('date', {})
+                last_date = date_obj.get('start', 'unknown') if date_obj else 'unknown'
+
+                print(f"✓ Loaded last record from Notion: {last_count} followers on {last_date}")
+                return last_count
+            else:
+                print("ℹ No historical data found in Notion (first run)")
+                return 0
+
+        except Exception as e:
+            print(f"⚠ Error loading last record from Notion: {e}")
+            return 0
+
+    def save_record(self, current_count, delta, growth_rate):
+        """Create new page in Notion database."""
+        if not self.client:
+            raise Exception("Not connected to Notion")
+
+        today = datetime.date.today().isoformat()
+
+        try:
+            # Create new page with properties
+            self.client.pages.create(
+                parent={"database_id": self.database_id},
+                properties={
+                    "Date": {
+                        "date": {
+                            "start": today
+                        }
+                    },
+                    "Followers Count": {
+                        "number": current_count
+                    },
+                    "Delta": {
+                        "number": delta
+                    },
+                    "Rate": {
+                        "rich_text": [
+                            {
+                                "text": {
+                                    "content": f"{growth_rate:.2f}%"
+                                }
+                            }
+                        ]
+                    }
+                }
+            )
+
+            print(f"✓ Saved record to Notion: {today}, {current_count} followers, Δ{delta:+d} ({growth_rate:+.2f}%)")
+
+        except Exception as e:
+            raise Exception(f"Failed to save record to Notion: {e}")
+
+
 def get_storage_backend():
     """
     Factory function to get appropriate storage backend based on environment.
@@ -181,7 +323,20 @@ def get_storage_backend():
     """
     storage_type = os.getenv('STORAGE_TYPE', 'csv').lower()
 
-    if storage_type == 'sheets':
+    if storage_type == 'notion':
+        token = os.getenv('NOTION_TOKEN')
+        database_id = os.getenv('NOTION_DATABASE_ID')
+
+        if not token or not database_id:
+            raise ValueError(
+                "Notion mode requires NOTION_TOKEN and NOTION_DATABASE_ID "
+                "environment variables"
+            )
+
+        print("📝 Using Notion storage")
+        return NotionStorage(token, database_id)
+
+    elif storage_type == 'sheets':
         spreadsheet_id = os.getenv('GOOGLE_SHEETS_ID')
         credentials_json = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON')
 

@@ -6,7 +6,7 @@
 
 - 🤖 **自动化执行** - 通过 GitHub Actions 每日自动运行
 - 📊 **增长追踪** - 计算每日关注数变化（delta）和增长率
-- 💾 **数据持久化** - 支持 CSV 本地存储和 Google Sheets 在线存储
+- 💾 **数据持久化** - 支持 CSV 本地存储、Google Sheets 在线存储和 Notion 数据库存储
 - 🔄 **容错机制** - API 调用失败自动重试
 - 💰 **零成本** - 完全基于免费服务（GitHub Actions + X API Free Tier）
 
@@ -93,7 +93,7 @@ date,followers_count,delta,rate
 |--------|------|--------|------|
 | `X_BEARER_TOKEN` | 是 | - | X API Bearer Token |
 | `X_USERNAME` | 是 | - | 要追踪的 X 用户名 |
-| `STORAGE_TYPE` | 否 | `csv` | 存储类型：`csv` 或 `sheets` |
+| `STORAGE_TYPE` | 否 | `csv` | 存储类型：`csv`、`sheets` 或 `notion` |
 
 ### CSV 存储配置（当 STORAGE_TYPE=csv 时）
 
@@ -107,6 +107,13 @@ date,followers_count,delta,rate
 |--------|------|--------|------|
 | `GOOGLE_SHEETS_ID` | 是 | - | Google Sheets 文档 ID |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | 是 | - | Google 服务账号 JSON（字符串） |
+
+### Notion 存储配置（当 STORAGE_TYPE=notion 时）
+
+| 变量名 | 必需 | 默认值 | 说明 |
+|--------|------|--------|------|
+| `NOTION_TOKEN` | 是 | - | Notion Integration Token |
+| `NOTION_DATABASE_ID` | 是 | - | Notion Database ID |
 
 ## Google Sheets 配置指南
 
@@ -149,6 +156,60 @@ GOOGLE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
 - `STORAGE_TYPE`: `sheets`
 - `GOOGLE_SHEETS_ID`: 你的 Spreadsheet ID
 - `GOOGLE_SERVICE_ACCOUNT_JSON`: 服务账号 JSON 内容（完整）
+
+## Notion 配置指南
+
+### 1. 创建 Notion Integration
+
+1. 访问 [Notion Integrations](https://www.notion.so/my-integrations)
+2. 点击 "+ New integration"
+3. 填写信息：
+   - **Name**: X Followers Tracker（或任意名称）
+   - **Associated workspace**: 选择你的工作区
+   - **Type**: Internal integration
+4. 点击 "Submit"
+5. **复制 Internal Integration Token**（格式：`secret_xxx...`）
+
+### 2. 创建 Notion Database
+
+1. 在 Notion 中创建一个新 Page
+2. 在 Page 中创建 Database（输入 `/database` 选择 "Table - Inline"）
+3. 创建以下列（Properties）：
+   - **Date** - 类型：Date
+   - **Followers Count** - 类型：Number
+   - **Delta** - 类型：Number
+   - **Rate** - 类型：Text
+
+### 3. 共享 Database 给 Integration
+
+1. 在 Database 页面，点击右上角 "..."
+2. 选择 "Connections" → "Connect to"
+3. 找到并选择你刚创建的 Integration
+
+### 4. 获取 Database ID
+
+从 Database URL 中复制 ID：
+```
+https://www.notion.so/workspace/<这部分是Database_ID>?v=...
+```
+
+Database ID 是一串32位字符（含连字符）。
+
+### 5. 配置环境变量
+
+```bash
+# .env 文件
+STORAGE_TYPE=notion
+NOTION_TOKEN=secret_xxxxxxxxxxxxxxxxxxxxx
+NOTION_DATABASE_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### 6. GitHub Actions 配置
+
+在 GitHub Secrets 中添加（如果使用 Notion 模式）：
+- `STORAGE_TYPE`: `notion`
+- `NOTION_TOKEN`: 你的 Integration Token
+- `NOTION_DATABASE_ID`: 你的 Database ID
 
 ## 项目结构
 
@@ -221,7 +282,7 @@ python test_storage.py
 - **依赖**: requests, python-dotenv
 - **API**: X API v2 (免费 tier)
 - **自动化**: GitHub Actions
-- **存储**: CSV 文件 / Google Sheets（可选）
+- **存储**: CSV 文件 / Google Sheets / Notion Database（可选）
 
 ## API 使用限制
 
