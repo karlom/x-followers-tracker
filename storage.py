@@ -220,11 +220,14 @@ class NotionStorage(StorageBackend):
             raise Exception(f"Failed to verify Notion database: {e}")
 
     def load_last_record(self):
-        """Load last record from Notion database."""
+        """Load last record from Notion database (excluding today's records)."""
         if not self.client:
             raise Exception("Not connected to Notion")
 
         try:
+            # Get today's date to exclude today's records
+            today = datetime.date.today().isoformat()
+
             # Use search API to find all pages
             # Note: In newer Notion API, we use search instead of database query
             response = self.client.search(
@@ -257,20 +260,23 @@ class NotionStorage(StorageBackend):
                 print("ℹ No historical data found in Notion (first run)")
                 return 0
 
-            # Sort pages by Date property
+            # Sort pages by Date property and filter out today's records
             dated_pages = []
             for page in database_pages:
                 properties = page.get('properties', {})
                 date_property = properties.get('Date', {})
                 date_obj = date_property.get('date', {})
                 if date_obj and date_obj.get('start'):
-                    dated_pages.append((page, date_obj.get('start')))
+                    record_date = date_obj.get('start')
+                    # Only include records from before today
+                    if record_date < today:
+                        dated_pages.append((page, record_date))
 
             if not dated_pages:
-                print("ℹ No dated records found in Notion")
+                print("ℹ No historical data found in Notion (first run)")
                 return 0
 
-            # Sort by date descending and get the latest
+            # Sort by date descending and get the latest (most recent date before today)
             dated_pages.sort(key=lambda x: x[1], reverse=True)
             latest_page, latest_date = dated_pages[0]
 
