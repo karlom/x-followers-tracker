@@ -19,6 +19,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Debug - Show current commit
+        run: |
+          echo "Current commit:"
+          git log -1 --oneline
+          echo ""
+          echo "Checking storage.py for the fix:"
+          grep -n "record_date < today" storage.py || echo "FIX NOT FOUND!"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
