@@ -59,9 +59,9 @@ python main.py
 #### 启用 GitHub Actions
 
 推送代码到 GitHub 后，GitHub Actions 将自动：
-- 每天 UTC 8:00 运行脚本
-- 更新 CSV 文件
-- 提交并推送更改到仓库
+- 每天北京时间早上 5:00（UTC 21:00）运行脚本
+- 将数据保存到配置的存储后端（CSV/Google Sheets/Notion）
+- CSV 模式下会自动提交并推送更改到仓库
 
 ## 数据格式
 
@@ -216,15 +216,18 @@ NOTION_DATABASE_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 x-followers-tracker/
 ├── main.py                 # 主脚本
-├── storage.py              # 存储抽象层（CSV/Sheets）
+├── storage.py              # 存储抽象层（CSV/Sheets/Notion）
 ├── test_tracker.py         # 功能测试
 ├── test_storage.py         # 存储后端测试
 ├── requirements.txt        # Python 依赖
 ├── .env.example            # 环境变量模板
 ├── .gitignore              # Git 忽略规则
 ├── CLAUDE.md               # Claude Code 项目文档
-├── IMPLEMENTATION_PLAN.md  # 开发计划（开发中）
-└── followers_log.csv       # 数据文件（CSV模式，自动生成）
+├── LICENSE                 # MIT 许可证
+├── README.md               # 项目文档
+└── .github/
+    └── workflows/
+        └── daily.yml       # GitHub Actions 工作流
 ```
 
 ## 运行测试
@@ -297,7 +300,8 @@ X API Free Tier 限制：
 - [x] Stage 2: 项目配置和文档
 - [x] Stage 3: GitHub Actions 自动化
 - [x] Stage 4: Google Sheets 支持
-- [ ] Stage 5: 最终验证和文档（进行中）
+- [x] Stage 5: Notion 数据库支持
+- [x] Stage 6: 最终验证和文档完善
 
 ## 许可证
 
