@@ -43,7 +43,7 @@ jobs:
           python main.py
 
       - name: Commit and push if changed (CSV mode only)
-        if: secrets.STORAGE_TYPE == '' || secrets.STORAGE_TYPE == 'csv'
+        if: ${{ !secrets.STORAGE_TYPE || secrets.STORAGE_TYPE == 'csv' }}
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
