@@ -207,24 +207,14 @@ class NotionStorage(StorageBackend):
             raise Exception(f"Failed to connect to Notion: {e}")
 
     def initialize(self):
-        """Verify Notion database connection and schema."""
+        """Verify Notion database connection."""
         if not self.client:
             raise Exception("Not connected to Notion")
 
         try:
-            # Retrieve database to verify it exists and is accessible
+            # Verify database exists and is accessible
             database = self.client.databases.retrieve(database_id=self.database_id)
-
-            # Check for required properties
-            properties = database.get('properties', {})
-            required = ['Date', 'Followers Count', 'Delta', 'Rate']
-            missing = [prop for prop in required if prop not in properties]
-
-            if missing:
-                print(f"⚠ Warning: Missing properties in Notion database: {', '.join(missing)}")
-                print(f"   Please add these properties to your database")
-            else:
-                print("✓ Notion database schema verified")
+            print("✓ Notion database connection verified")
 
         except Exception as e:
             raise Exception(f"Failed to verify Notion database: {e}")
@@ -235,39 +225,62 @@ class NotionStorage(StorageBackend):
             raise Exception("Not connected to Notion")
 
         try:
-            # Query database, sorted by Date descending
-            response = self.client.databases.query(
-                database_id=self.database_id,
-                sorts=[
-                    {
-                        "property": "Date",
-                        "direction": "descending"
-                    }
-                ],
-                page_size=1
+            # Use search API to find all pages
+            # Note: In newer Notion API, we use search instead of database query
+            response = self.client.search(
+                filter={
+                    "property": "object",
+                    "value": "page"
+                },
+                sort={
+                    "direction": "descending",
+                    "timestamp": "last_edited_time"
+                },
+                page_size=100  # Get more pages to filter by database
             )
 
             results = response.get('results', [])
 
-            if results:
-                # Extract data from the last record
-                page = results[0]
-                properties = page.get('properties', {})
+            # Filter pages that belong to our database and have Date property
+            database_pages = []
+            for page in results:
+                # Check if page belongs to our database
+                parent = page.get('parent', {})
+                parent_type = parent.get('type')
+                # In Notion API 2025, type changed from 'database_id' to 'data_source_id'
+                if parent_type in ['database_id', 'data_source_id']:
+                    parent_db_id = parent.get('database_id') or parent.get('data_source_id')
+                    if parent_db_id == self.database_id:
+                        database_pages.append(page)
 
-                # Get followers count
-                followers_property = properties.get('Followers Count', {})
-                last_count = followers_property.get('number', 0)
-
-                # Get date for logging
-                date_property = properties.get('Date', {})
-                date_obj = date_property.get('date', {})
-                last_date = date_obj.get('start', 'unknown') if date_obj else 'unknown'
-
-                print(f"✓ Loaded last record from Notion: {last_count} followers on {last_date}")
-                return last_count
-            else:
+            if not database_pages:
                 print("ℹ No historical data found in Notion (first run)")
                 return 0
+
+            # Sort pages by Date property
+            dated_pages = []
+            for page in database_pages:
+                properties = page.get('properties', {})
+                date_property = properties.get('Date', {})
+                date_obj = date_property.get('date', {})
+                if date_obj and date_obj.get('start'):
+                    dated_pages.append((page, date_obj.get('start')))
+
+            if not dated_pages:
+                print("ℹ No dated records found in Notion")
+                return 0
+
+            # Sort by date descending and get the latest
+            dated_pages.sort(key=lambda x: x[1], reverse=True)
+            latest_page, latest_date = dated_pages[0]
+
+            # Extract followers count
+            properties = latest_page.get('properties', {})
+            followers_property = properties.get('Followers Count', {})
+            last_count = followers_property.get('number', 0)
+
+            print(f"✓ Loaded last record from Notion: {last_count} followers on {latest_date}")
+            return last_count
 
         except Exception as e:
             print(f"⚠ Error loading last record from Notion: {e}")
