@@ -259,6 +259,16 @@ class NotionStorage(StorageBackend):
                         database_pages.append(page)
 
             print(f"🔍 Debug: Found {len(database_pages)} pages in our database")
+            print(f"🔍 Debug: Expected database_id = {self.database_id}")
+
+            # Debug: Show what we're actually getting
+            if len(results) > 0 and len(database_pages) == 0:
+                print("🔍 Debug: No matches found. Checking first few pages:")
+                for i, page in enumerate(results[:3]):
+                    parent = page.get('parent', {})
+                    parent_type = parent.get('type')
+                    parent_db_id = parent.get('database_id') or parent.get('data_source_id')
+                    print(f"  Page {i+1}: type={parent_type}, id={parent_db_id}")
 
             if not database_pages:
                 print("ℹ No historical data found in Notion (first run)")
